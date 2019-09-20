@@ -12,7 +12,7 @@ else if(process.env.bchd_url)
 else
     grpc = new GrpcClient();
 
-const getTxOut = async (hash: string, vout: number): Promise<TxOutResult|GetUnspentOutputResponse|null> =>  {
+const getTxOut = async (hash: string, vout: number): Promise<GetUnspentOutputResponse|null> =>  {
     try {
         let utxo = (await grpc.getUnspentTransaction({ hash: hash, vout: vout, includeMempool: true }));
         return utxo;
@@ -26,32 +26,18 @@ const grpcSubscribe = async () => {
     txnstream = await grpc.subscribeTransactions({ includeMempoolAcceptance: true, includeSerializedTxn: false, includeBlockAcceptance: false })
     txnstream.on('data', async function(data: TransactionNotification) {
         let inputs = data.getUnconfirmedTransaction()!.getTransaction()!.getInputsList();
+        console.log("Input Count:", inputs.length);
         for(let i = 0; i < inputs.length; i++) {
             let txid = Buffer.from(inputs[i].getOutpoint()!.getHash_asU8()).toString('hex');
             let idx = inputs[i].getOutpoint()!.getIndex();
-            console.log("New txn:", txid);
+            console.log("Input:", txid, idx);
             let status = await getTxOut(txid, idx);
             if(status)
-                console.log("Error: Txn notified but UTXO still exists.");
+                console.log("Error: Txn notified but UTXO not spent in 'gettxout'.");
             else
-                console.log("OK")
+                console.log("OK (marked spent)")
         }
     });
 }
 
 grpcSubscribe();
-
-interface TxOutResult {
-    bestblock: string
-    confirmations: number
-    value: number
-    scriptPubKey: {
-      asm: string
-      hex: string
-      reqSigs: number
-      type: string
-      addresses: string[]
-    }
-    version: number
-    coinbase: boolean
-  }
